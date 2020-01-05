@@ -1,0 +1,241 @@
+---
+title: "Higher Education Outcomes"
+author: "Sampritha Hassan Manjunath; Student ID 19232922"
+date: "10/22/2019"
+output: pdf_document
+---
+
+# Setup
+
+```{r setup, echo=TRUE}
+# this setup chunk loads the tidyverse. no other libraries should be used
+library("tidyverse")
+
+# setting echo=TRUE will cause all R code to be included in the pdf output
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+# Installing Latex
+
+If you don't have Latex installed on your machine, you may see an
+error when `knit`ting this file, and no pdf will be produced. Try
+installing Latex as follows, and `knit` again.
+
+```
+# see https://yihui.name/tinytex/ for docs
+> install.packages('tinytex')
+> tinytex::install_tinytex()
+```
+
+
+
+# Loading data
+
+First, load the data, and convert to a tibble (i.e. a `dplyr` dataframe) named `earnings`, with column names "Years.since.graduation", "NFQ.Level", "Sex", "Field", "Statistic", and "Value".
+
+```{r}
+# STUDENTS ADD CODE HERE
+# Load csv and add column names to each column. Also fill ..(empty value) with NA
+data <- read.csv2("earnings.csv", header = FALSE, 
+                  col.names = c("Years.since.graduation", "NFQ.Level", "Sex",
+                                "Field", "Statistic", "Value"), na = "..")
+
+# Convert data to a tibble (data frame)
+earnings <- as_tibble(data)
+
+# print data frame
+earnings
+```
+
+
+# Reshaping and cleaning
+
+We should change the NFQ Level values to integers. The following function will be useful:
+
+```{r, echo=TRUE}
+convert_nfq <- function(s) {strtoi(substr(s, 11, 13))} # convert substring to int
+```
+
+Apply `convert_nfq` and check the result:
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Replace  string values in NFQ.Level by Integer values 
+# with the help of confert_nfq function
+earnings <- earnings %>% mutate(NFQ.Level = convert_nfq(NFQ.Level))
+
+# Print the resulting data frame
+earnings
+```
+
+Let's rename the `Years.since.graduation` column since it's a long name:
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Rename Years.since,graduation column to Years
+earnings <- earnings %>% rename(Years = Years.since.graduation)
+
+# Print the resulting data frame
+earnings
+```
+
+Using `filter`, we discard all data where `Years` is not 1, because for some reason all that data is `NA`. Notice this reduces from 1600 rows to 400. 
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Filter data frame to select only rows where Years = 1
+earnings <- earnings %>% filter(Years == 1)
+
+# Print the resulting data frame
+earnings
+```
+
+Our analysis is going to be based on Field, Sex, NFQ Level, Median Earnings, and Number of Graduates. We would like to have a column giving Median Earnings and another column giving Number of Graduates. That would be *tidy data*. Instead, we have one column giving the `Statistic` name, and another giving that statistic's `Value`. We fix this using `spread`. Notice that in the result, there
+are several new columns. Some are shown directly, and the tibble says
+"2 more variables" at the bottom.
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Separte column statistic and value to generate new columns
+# (as Keys from 'statistic' value from 'value')
+# Convert attribute, helps to get the type of new column created
+earnings <- earnings %>% spread(Statistic, Value, convert = TRUE)
+
+# Print the resulting data frame
+earnings
+```
+
+Now we can discard the 25th and 75th percentiles and rename the other
+columns:
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Drop columns
+earnings <- select(earnings, -c('P25 Earnings of Graduates (Euro)', 
+                                'P75 Earnings of Graduates (Euro)'))
+
+# Rename columns
+earnings <- earnings %>% rename(Number.grads = `Number of Graduates (Persons)`, 
+                                Median.Earnings = `P50 Earnings of Graduates (Euro)`)
+
+# Rename can also be done as below. I have just preferred to use the above written one
+#colnames(earnings)[5] <- "Number.grads"
+#colnames(earnings)[6] <- "Median.grads"
+
+# Print the resulting data frame
+earnings
+```
+
+Now, let's have a summary of what we've got:
+```{r}
+summary(earnings)
+```
+
+
+# Plotting
+
+Now we are ready to make a first plot. Let's look at the number of grads, by field and NFQ level.
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Load the data frame to new variable
+mpg <- earnings
+
+# plot the graph with x and y as 'NFQ.Level' and 'Field' by taking Number.grads as the size 
+# Specifies how many grad are in what field and in which NFQ Level
+ggplot(mpg) + geom_point(aes(x = NFQ.Level, y = Field, size = Number.grads))
+```
+
+Now we'll analyse the data by Sex. Getting the male and female dots to appear correctly is tricky, so here is a snippet you can add to your `ggplot` call:
+
+`geom_point(position=position_nudge(x=0.25*(as.numeric(earnings$Sex) - 1.5)))`
+
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Filter out the dataframe as 'Females' and 'Males' and colour according to the Sex
+mpg %>% filter(Sex == "Female" | Sex == "Male") %>%
+  ggplot(mapping = aes(x=NFQ.Level, y=Field, size = Number.grads, colour = Sex)) +
+  geom_point(position=position_nudge(x=0.25*(as.numeric(earnings$Sex) - 1.5)))
+```
+
+Here is a more traditional scatter plot, but bear in mind that what we see are distributions of median earnings, not distributions of earnings. We will see a Warning message "Removed 17 rows containing missing values (geom_point)." - this is correct, of course, as we do have NA values for earnings wherever there were no grads. We can ignore it. 
+```{r}
+# STUDENTS ADD CODE HERE
+
+# Number if gradutes are now measured based on NFQ.Level and Median,Earnings
+# alpha ia added to give the transparency and the overlapping picture in the graph
+mpg %>% filter(Sex == "Female" | Sex == "Male") %>%
+  ggplot(mapping = aes(x=NFQ.Level, y=Median.Earnings, size = Number.grads, colour = Sex)) +
+  geom_point(position=position_nudge(x=0.25*(as.numeric(earnings$Sex) - 1.5)), alpha = 0.5)
+```
+
+# Join
+
+Downloaded HEO02: Number of Graduates by NFQ Level, Sex, Type of Institute, Field of Study and Year, for year 2016
+
+
+Loading and Processing the data as done earlier.
+```{r}
+# Load csv and add column names to each column. Also fill ..(empty value) with NA
+new_data <- read.csv("earnings_new.csv", header = FALSE, 
+                     col.names = c("NFQ.Level", "Type.Of.Institute", "Sex", "Field",
+                                    "Number.grads"), na = "..")
+
+# Convert data to a tibble (data frame)
+new_earnings <- as_tibble(new_data)
+
+# Replace  string values in NFQ.Level by Integer values with the help of confert_nfq function
+new_earnings <- new_earnings %>% mutate(NFQ.Level = convert_nfq(NFQ.Level))
+
+# filter columns where Number of graduates is zero 
+new_earnings <- new_earnings %>% filter(Number.grads != 0)
+
+# Print the resulting data frame
+new_earnings
+
+summary(new_earnings)
+```
+
+
+Perform full_join of earnings and new_earnings and save the result to new data frame for further use
+
+```{r}
+# perform full join 
+join_earnings <- full_join(earnings, new_earnings, by = c("NFQ.Level", "Sex", "Field", "Number.grads"))
+
+join_earnings
+```
+
+```{r}
+# Remove rows where Type of Institute is null
+join_earnings <- join_earnings %>% filter(is.na(Type.Of.Institute) == FALSE)
+
+join_earnings
+```
+
+------------------------------------------Analysis----------------------------------------------
+
+The intention behind the below analysis to check which 'Type of Insititute' graduates choose for different fields of study, along with diversity ratio.
+
+
+```{r}
+mpg <- join_earnings
+
+# Check how many graduates are involved in each field along with diversity ratio
+# Also plots which Type of Institute students prefer for respective Fields
+mpg %>% ggplot(mapping = aes(x = NFQ.Level, y = Type.Of.Institute, size = Number.grads, 
+                             colour = Sex)) + 
+  geom_point(position=position_nudge(x=0.25*(as.numeric(join_earnings$Type.Of.Institute) - 1.5)),
+             alpha = 0.5) + 
+  facet_wrap(~Field)
+```
+Based on above plotting, it can be concluded that most of the students prefer 'University' for thier field of study. To narrow it down, it can be observed that most of the Master's and Ph.D students prefer 'University' above the other two types of Institute.
+
+--------------------------------------End of Analysis------------------------------------------
+
